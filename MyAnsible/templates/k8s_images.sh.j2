@@ -1,0 +1,13 @@
+#!/bin/bash
+images=(kube-proxy-amd64:v{{k8s_version}} \
+        kube-scheduler-amd64:v{{k8s_version}} \
+        kube-controller-manager-amd64:v{{k8s_version}} \
+        kube-apiserver-amd64:v{{k8s_version}} \
+        etcd-amd64:{{etcd_version}} \
+        coredns:{{coredns_version}} \
+        pause:{{pause_version}})
+for imageName in ${images[@]}
+dor pull {{aliyun_registry}}/$imageName
+    docker tag {{aliyun_registry}}/$imageName k8s.gcr.io/$imageName
+    docker rmi {{aliyun_registry}}/$imageName
+done

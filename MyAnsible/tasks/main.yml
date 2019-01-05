@@ -1,0 +1,88 @@
+## ---------环境配置部分-----------
+- name: 关闭防火
+  shell: "systemctl stop firewalld && systemctl disable firewalld"
+  
+- name: 关闭selinux
+  shell: "sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config"
+
+- name: 关闭各节点swap
+  shell: "sed -i '/swap/ s@^\(.*\)$@#\1@g' /etc/fstab"  
+  
+- name: kubernetes.conf
+  copy: src=kubernetes.conf dest=/etc/sysctl.d/kubernetes.conf mode=0755
+
+- name: 安装基础软件包
+  yum: 
+    name: 
+      - conntrack-tools     # ipvs 模式需要
+      - psmisc        # 安装psmisc 才能使用命令killall，它在keepalive的监测脚本中使用到
+      - nfs-utils     # 挂载nfs 共享文件需要 (创建基于 nfs的PV 需要)
+      - jq                  # 轻量JSON处理程序，安装docker查询镜像需要
+      - socat               # 用于port forwarding
+      - bash-completion     # bash命令补全工具，需要重新登录服务器生效
+      - rsync               # 文件同步工具，分发证书等配置文件需要
+      - ipset
+      - ipvsadm
+      - epel-release
+      - yum-utils
+      - device-mapper-persistent-data
+      - lvm2
+      - wget
+    state: latest
+    
+- name: 添加docker aliyun yum源
+  shell: "yum-config-manager --add-repo http://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo"  
+
+- name: 安装docker
+  yum: 
+    name: 
+      - docker-ce #docker
+    state: latest
+
+- name: 配置docker mirror
+  shell: "curl -sSL https://get.daocloud.io/daotools/set_mirror.sh | sh -s http://bc437cce.m.daocloud.io"  
+
+- name: 启动docker
+  shell: "systemctl enable docker && systemctl restart docker"  
+    
+- name: kubernetes.conf
+  copy: src=kubernetes.repo dest=/etc/yum.repos.d/kubernetes.repo mode=0755
+
+- name: 安装kubeadm、kubelet、kubectl
+  yum: 
+    name: 
+      - kubeadm-{{k8s_version}}
+      - kubelet-{{k8s_version}}
+      - kubectl-{{k8s_version}}
+
+- name: 启动kubelet
+  shell: "systemctl enable kubelet && systemctl restart kubelet"      
+
+ 
+- name: 复制拉取镜像脚本到k8s节点
+  template: src=k8s_images.sh.j2 dest=/root/k8s_images.sh
+  tags: upgrade_docker, download_docker
+
+- name: 拉取集etcd，kube-apiserver，kube-controller-manager，kube-scheduler镜像
+  shell: "bash /root/k8s_images.sh"
+  
+- name: kubeadm初使化集群
+  shell: "kubeadm init \
+          --kubernetes-version=v{{k8s_version}} \
+          --pod-network-cidr=10.244.0.0/16 \
+          --service-cidr=10.96.0.0/12 \
+          --apiserver-advertise-address=192.168.0.121"
+  register: output
+
+- name: kubeadm初使化集群
+  shell: "kubeadm init \
+          --kubernetes-version=v{{k8s_version}} \
+          --pod-network-cidr=10.244.0.0/16 \
+          --service-cidr=10.96.0.0/12 \
+          --apiserver-advertise-address=192.168.0.121"
+  register: output
+  
+- name: 向集群加入node节点
+  shell: "kubeadm join 172.240.24.188:6443 --token aye96c.hdo6xzlskgmk4anz --discovery-token-ca-cert-hash sha256:b2ff321b46be33766a73191f31f6401eccac455eac9faeb6bf4c30a9e8407923
+"  
+  

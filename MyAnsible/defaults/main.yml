@@ -1,0 +1,15 @@
+#注意k8s安装版本的配套
+# k8s版本
+k8s_version: 1.11.3
+
+#etcd版本
+etcd_version: 3.2.18
+
+#coredns版本
+coredns_version: 1.1.3
+
+#pause版本
+pause_version: 3.1
+
+#aliyun镜像库
+aliyun_registry: registry.cn-hangzhou.aliyuncs.com/google_containers
